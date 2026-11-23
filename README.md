@@ -71,6 +71,19 @@ Detailed server statistics with a visual load indicator.
 
 ![BBB2 Server Monitoring](screenshots/server-details.PNG)
 
+
+### Historical Server Load Charts
+
+Monitoring server activity over a selected date range.
+
+The bot displays:
+- Total number of online participants over time
+- Server load percentage for individual servers
+- Number of participants on each server
+- Peak participant and meeting counts
+
+![BBB Monitor Historical Charts](screenshots/load-charts.PNG)
+
 ## 🔒 Security
 
 API credentials, Telegram bot tokens, and private server information are not included in this repository.
