@@ -65,6 +65,11 @@ Server selection:
 
 ![BBB Monitor Overall Statistics](screenshots/overall-statistics.PNG)
 
+### Individual Server Monitoring — BBB2
+
+Detailed server statistics with a visual load indicator.
+
+![BBB2 Server Monitoring](screenshots/server-details.PNG)
 
 ## 🔒 Security
 
