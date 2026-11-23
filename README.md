@@ -59,8 +59,7 @@ Server selection:
 
 ### Telegram Bot — Main Menu
 
-![BBB Monitor Main Menu](screenshots/main-menu.png)
-  
+![BBB Monitor Main Menu](screenshots/main-menu.PNG)
 
 ## 🔒 Security
 
