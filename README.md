@@ -57,7 +57,10 @@ Server selection:
 
 ## 📸 Screenshots
 
-Screenshots of the Telegram bot, monitoring reports, charts, and n8n workflows will be added here.
+### Telegram Bot — Main Menu
+
+![BBB Monitor Main Menu](screenshots/main-menu.png)
+  
 
 ## 🔒 Security
 
