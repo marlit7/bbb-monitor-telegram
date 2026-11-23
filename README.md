@@ -61,6 +61,11 @@ Server selection:
 
 ![BBB Monitor Main Menu](screenshots/main-menu.PNG)
 
+### Overall Server Statistics
+
+![BBB Monitor Overall Statistics](screenshots/overall-statistics.PNG)
+
+
 ## 🔒 Security
 
 API credentials, Telegram bot tokens, and private server information are not included in this repository.
