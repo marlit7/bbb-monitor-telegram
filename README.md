@@ -83,6 +83,25 @@ The bot displays:
 - Peak participant and meeting counts
 
 ![BBB Monitor Historical Charts](screenshots/load-charts.PNG)
+## ⚙️ n8n Workflow
+
+The main workflow is available in JSON format.
+
+[View n8n Workflow](workflows/bbb-monitor-public.json)
+
+### Setup Instructions
+
+1. Install and configure n8n.
+2. Import the JSON workflow into n8n.
+3. Create a Telegram bot using BotFather.
+4. Configure Telegram credentials.
+5. Configure BigBlueButton API access.
+6. Create and configure the required data tables.
+7. Configure the required supporting workflows.
+8. Test the workflow before activating it.
+
+**Note:** This is a sanitized portfolio version.
+Additional configuration is required before use.
 
 ## 🔒 Security
 
