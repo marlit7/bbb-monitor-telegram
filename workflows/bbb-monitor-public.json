@@ -1,0 +1,2353 @@
+{
+  "name": "BBB Monitor — Demo",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BBB_SERVERS_ID",
+          "mode": "list",
+          "cachedResultName": "bbb servers"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        928,
+        176
+      ],
+      "id": "65735427-5040-4994-98ed-c29af0fcccac",
+      "name": "Get BBB Servers"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        624,
+        32
+      ],
+      "id": "6c7554a9-395e-45c9-bed0-0d0740927a52",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 3000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1072,
+        240
+      ],
+      "id": "9ea0feb6-7d5f-453e-a4ca-0591169a7ec7",
+      "name": "BBB — Universal Request",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "21fa874f-317b-459d-a932-adf813ca5a0c",
+              "name": "name",
+              "value": "={{ $('Get BBB Servers').item.json.name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1296,
+        144
+      ],
+      "id": "b4cf2b75-e44b-4bc8-92db-6f23ccc78132",
+      "name": "Edit Fields6"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        144
+      ],
+      "id": "bb81a9aa-54f7-422b-bd50-3550dca448ec",
+      "name": "XML6"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5e6da7ed-e94c-4fac-a91e-49b574b34939",
+              "name": "name",
+              "value": "={{ $('Edit Fields6').item.json.name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1744,
+        144
+      ],
+      "id": "019a19b3-f641-404a-91e9-fabeea084839",
+      "name": "Add Server Name"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "004cb8a8-1600-413f-b0e7-50c239a5621e",
+              "name": "name",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "4176b2f0-0f41-4720-bafc-af306801843e",
+              "name": "status",
+              "value": "unavailable",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1280,
+        320
+      ],
+      "id": "9061305c-f3a6-461b-b538-a6a59afc89a2",
+      "name": "Edit Fields7"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1968,
+        176
+      ],
+      "id": "5eb2a2df-36b6-41e2-9195-a0eff36451bf",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "\nitems = _items\n\nCAPACITY = 400\n\nservers = []\nseen_servers = set()\n\ntotal_meetings = 0\ntotal_participants = 0\nactive_servers = 0\nunavailable_servers = 0\n\n\ndef get_number(value):\n    if isinstance(value, dict):\n        value = value.get(\"#text\", 0)\n    try:\n        return int(value)\n    except (ValueError, TypeError):\n        return 0\n\n\ndef get_meetings(data):\n    response = data.get(\"response\", data)\n\n    if not isinstance(response, dict):\n        return None\n\n    returncode = response.get(\"returncode\")\n\n    if isinstance(returncode, dict):\n        returncode = returncode.get(\"#text\")\n\n    if returncode is not None and str(returncode).upper() != \"SUCCESS\":\n        return None\n\n    meetings_data = response.get(\"meetings\", {})\n\n    if not isinstance(meetings_data, dict):\n        return []\n\n    meetings = meetings_data.get(\"meeting\", [])\n\n    if isinstance(meetings, dict):\n        return [meetings]\n\n    if isinstance(meetings, list):\n        return meetings\n\n    return []\n\n\ndef load_indicator(load):\n    # 10 сегментів = 100%\n    filled = max(0, min(10, round(load / 10)))\n    empty = 10 - filled\n\n    bar = \"▰\" * filled + \"▱\" * empty\n\n    if load < 50:\n        color = \"🟢\"\n    elif load < 80:\n        color = \"🟡\"\n    else:\n        color = \"🔴\"\n\n    return f\"{color} {bar}\"\n\n\nfor item in items:\n    data = item[\"json\"]\n\n    name = str(\n        data.get(\"server_name\")\n        or data.get(\"server\")\n        or data.get(\"name\")\n        or \"BBB\"\n    ).strip()\n\n    # Не додаємо один сервер двічі\n    if name in seen_servers:\n        continue\n\n    seen_servers.add(name)\n\n    status = str(data.get(\"status\", \"\")).lower()\n\n    if status == \"unavailable\" or data.get(\"error\"):\n        servers.append({\n            \"name\": name,\n            \"available\": False\n        })\n        continue\n\n    if \"total_meetings\" in data or \"total_participants\" in data:\n        meetings_count = get_number(\n            data.get(\"total_meetings\", 0)\n        )\n        participants = get_number(\n            data.get(\"total_participants\", 0)\n        )\n    else:\n        meetings = get_meetings(data)\n\n        if meetings is None:\n            servers.append({\n                \"name\": name,\n                \"available\": False\n            })\n            continue\n\n        meetings_count = len(meetings)\n\n        participants = sum(\n            get_number(m.get(\"participantCount\", 0))\n            for m in meetings\n            if isinstance(m, dict)\n        )\n\n    servers.append({\n        \"name\": name,\n        \"available\": True,\n        \"meetings\": meetings_count,\n        \"participants\": participants\n    })\n\n\ndef sort_key(server):\n    name = server[\"name\"]\n    number = name.replace(\"BBB\", \"\")\n\n    try:\n        return int(number)\n    except (ValueError, TypeError):\n        return 9999\n\n\nlines = [\"📊 BBB Monitor — звіт\", \"\"]\n\nfor server in sorted(servers, key=sort_key):\n    name = server[\"name\"]\n\n    if not server[\"available\"]:\n        unavailable_servers += 1\n\n        lines.append(f\"🖥 {name} — 🔴 Недоступний\")\n        lines.append(\"━━━━━━━━━━━━━━\")\n        lines.append(\"\")\n        continue\n\n    meetings_count = server[\"meetings\"]\n    participants = server[\"participants\"]\n\n    active_servers += 1\n    total_meetings += meetings_count\n    total_participants += participants\n\n    load = participants / CAPACITY * 100\n\n    lines.append(f\"🖥 {name} — 🟢 Працює\")\n    lines.append(\n        f\"🎥 Активних конференцій: {meetings_count}\"\n    )\n    lines.append(\n        f\"👥 Учасників онлайн: {participants} / {CAPACITY}\"\n    )\n    lines.append(f\"📈 Завантаженість: {load:.1f}%\")\n    lines.append(load_indicator(load))\n    lines.append(\"━━━━━━━━━━━━━━\")\n    lines.append(\"\")\n\n\ntotal_capacity = active_servers * CAPACITY\n\ntotal_load = (\n    total_participants / total_capacity * 100\n    if total_capacity else 0\n)\n\nlines.append(\"📌 ЗАГАЛЬНИЙ ПІДСУМОК\")\nlines.append(f\"🟢 Доступних серверів: {active_servers}\")\nlines.append(f\"🔴 Недоступних серверів: {unavailable_servers}\")\nlines.append(f\"🎥 Активних конференцій: {total_meetings}\")\nlines.append(\n    f\"👥 Учасників онлайн: {total_participants} / {total_capacity}\"\n)\nlines.append(\n    f\"📈 Загальна завантаженість: {total_load:.1f}%\"\n)\n\nif active_servers > 0:\n    lines.append(load_indicator(total_load))\n\nreport = \"\\n\".join(lines)\n\nreturn [{\n    \"json\": {\n        \"report\": report,\n        \"text\": report\n    }\n}]\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2192,
+        176
+      ],
+      "id": "12550e03-8560-4877-b284-aab70345f428",
+      "name": "Code in Python7"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').first().json.message.chat.id }}",
+        "text": "={{ $json.report }}",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📊 Загальна статистика",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "🖥 Вибір сервера",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📈 Графіки навантаження",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2640,
+        192
+      ],
+      "id": "90a4992c-e677-4edc-8417-33058f3b0eff",
+      "name": "Send a text message7"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -320,
+        528
+      ],
+      "id": "09e674c7-058c-4ec7-87fd-bd7a2c99cad2",
+      "name": "Telegram Trigger1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "📊 Загальна статистика",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    },
+                    "id": "d81beae6-d85e-49bd-8b93-44cc2ddd9bcd"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "14b5430e-d645-47e7-8ac9-8764ca13b17a",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.message.text || '' }}",
+                    "rightValue": "🖥 Вибір сервера",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "3d0a19b5-b84f-4900-bdae-ab7a59963217",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "59bef32a-d380-42a6-b0d8-464a5915dcb0",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "^BBB\\d+$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "5f04b5ec-7f87-4920-9d09-985540c83ca9",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "⬅️ Назад",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "d8c54a98-f101-4b95-99f8-9c839259be2e",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "📈 Графіки навантаження",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "bf10735c-f7ef-47e1-8d88-b9aafa981fc6",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "📅 Сьогодні",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "a78c322f-8fe6-4ec1-8840-080fab9c8983",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "📆 Період",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "e6049e0b-f9b5-42f9-bb0f-7aedfae47bd0",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "^cal_day_\\d{4}-\\d{2}-\\d{2}$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "8168f714-4033-4adf-97d0-65ecf29cacb2",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "^cal_single_\\d{4}-\\d{2}-\\d{2}$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "425735ea-62b3-44a4-a71d-ebb6c4110c94",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "^cal_end_\\d{4}-\\d{2}-\\d{2}$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "9d72f6d4-919d-4406-8e24-94f7681e1b44",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "^cal_range_\\d{4}-\\d{2}-\\d{2}_\\d{4}-\\d{2}-\\d{2}$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "88e431e5-9f0e-43f2-b0d0-3016df1416fa",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "^cal_end_(prev|next)_\\d{4}-\\d{2}-\\d{2}_\\d{4}-\\d{2}$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "eed07f75-28ce-442f-bb24-00561353fc4f",
+                    "leftValue": "={{ $('Telegram Trigger1').first().json.callback_query?.data || $('Telegram Trigger1').first().json.message?.text || '' }}",
+                    "rightValue": "^cal_(prev|next)$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        240,
+        32
+      ],
+      "id": "60cf49bc-7486-427e-b2b0-45c7a0c5e79d",
+      "name": "Switch3"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BBB_SERVERS_ID",
+          "mode": "list",
+          "cachedResultName": "bbb servers"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        320
+      ],
+      "id": "18150e71-bb1d-47b8-83da-1037a2b86dbd",
+      "name": "Get row(s)2"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "servers = _items\n\nbuttons = []\nseen = set()\n\nfor item in servers:\n    data = item.get(\"json\", {})\n    name = str(data.get(\"name\", \"\")).strip()\n\n    if name and name not in seen:\n        seen.add(name)\n        buttons.append({\"text\": name})\n\nkeyboard = []\n\nfor i in range(0, len(buttons), 2):\n    keyboard.append(buttons[i:i + 2])\n\nkeyboard.append([{\"text\": \"⬅️ Назад\"}])\n\nreturn [{\n    \"json\": {\n        \"keyboard\": keyboard,\n        \"text\": \"🖥 Оберіть сервер:\"\n    }\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        480
+      ],
+      "id": "063909d5-71c8-4e97-b48d-e52721e33a76",
+      "name": "Code in Python8"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').first().json.message.chat.id }}",
+        "text": "📊 BBB Monitor\nОберіть потрібну дію:",
+        "replyMarkup": "=replyKeyboard",
+        "forceReply": {},
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📊 Загальна статистика",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "🖥 Вибір сервера",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📈 Графіки навантаження",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true
+        },
+        "replyKeyboardRemove": {},
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        480
+      ],
+      "id": "6a69fd11-9cd2-4270-bec4-6d33b2c4cf1e",
+      "name": "Send a text message8",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botREPLACE_WITH_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $('Telegram Trigger1').first().json.message.chat.id,\n  text: $json.text,\n  reply_markup: {\n    keyboard: $json.keyboard,\n    resize_keyboard: true\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1296,
+        512
+      ],
+      "id": "580ee0c4-f466-495e-bff6-34c97b6f4d9f",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "372b29b8-7186-4013-980f-10c3c1909f66",
+              "name": "server_name",
+              "value": "={{ $json.message.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        880,
+        704
+      ],
+      "id": "5b773b13-026c-43d1-85ce-e3e1e6f64a69",
+      "name": "Selected BBB Server"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BBB_SERVERS_ID",
+          "mode": "list",
+          "cachedResultName": "bbb servers"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "name",
+              "keyValue": "={{ $('Telegram Trigger1').first().json.message.text.trim() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1104,
+        704
+      ],
+      "id": "a25bc086-6b00-41ff-b3b9-b62f8d8aa637",
+      "name": "Get row(s)3"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1328,
+        704
+      ],
+      "id": "83dfe059-b11b-4eee-858d-9fcbc1253f87",
+      "name": "Check Selected BBB",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        656
+      ],
+      "id": "169eb1ad-64cc-4178-a0bd-155a24740b29",
+      "name": "XML7"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fb5f01e9-87c8-4279-b559-98025d651120",
+              "name": "server_name",
+              "value": "={{ $('Get row(s)3').first().json.name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1776,
+        656
+      ],
+      "id": "1e9ab7a4-dbb3-4f46-89a1-1958b58aadc3",
+      "name": "Add Selected Server Name"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "\nitems = _items\nresults = []\n\nCAPACITY = 400\n\nfor item in items:\n    data = item[\"json\"]\n    server_name = data.get(\"server_name\", \"BBB\")\n\n    # Отримуємо відповідь після XML\n    response = data.get(\"response\", {})\n\n    if not isinstance(response, dict):\n        response = {}\n\n    # Перевіряємо статус відповіді BBB\n    returncode = response.get(\"returncode\", \"\")\n\n    if isinstance(returncode, dict):\n        returncode = returncode.get(\"#text\", \"\")\n\n    # Якщо BBB повернув помилку\n    if str(returncode).upper() != \"SUCCESS\":\n        results.append({\n            \"json\": {\n                \"server_name\": server_name,\n                \"status\": \"unavailable\",\n                \"total_meetings\": 0,\n                \"total_participants\": 0,\n                \"load_percent\": 0,\n                \"text\": f\"🔴 {server_name}\\nНедоступний\"\n            }\n        })\n        continue\n\n    # Отримуємо конференції\n    meetings_data = response.get(\"meetings\", {})\n\n    if not isinstance(meetings_data, dict):\n        meetings_data = {}\n\n    meetings = meetings_data.get(\"meeting\", [])\n\n    if isinstance(meetings, dict):\n        meetings = [meetings]\n    elif not isinstance(meetings, list):\n        meetings = []\n\n    total_meetings = len(meetings)\n    total_participants = 0\n\n    for meeting in meetings:\n        if not isinstance(meeting, dict):\n            continue\n\n        count = meeting.get(\"participantCount\", 0)\n\n        if isinstance(count, dict):\n            count = count.get(\"#text\", 0)\n\n        try:\n            total_participants += int(count)\n        except (ValueError, TypeError):\n            pass\n\n    load_percent = round(\n        total_participants / CAPACITY * 100, 1\n    )\n\n    # Повідомлення для Telegram\n    message = (\n        f\"🟢 {server_name}\\n\"\n        f\"📹 Конференцій: {total_meetings}\\n\"\n        f\"👥 Учасників: {total_participants}\\n\"\n        f\"📊 Завантаженість: {load_percent}%\"\n    )\n\n    results.append({\n        \"json\": {\n            \"server_name\": server_name,\n            \"status\": \"available\",\n            \"total_meetings\": total_meetings,\n            \"total_participants\": total_participants,\n            \"capacity\": CAPACITY,\n            \"load_percent\": load_percent,\n            \"text\": message\n        }\n    })\n\nreturn results\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        656
+      ],
+      "id": "97ce8773-7825-48ea-a66f-f4858da86716",
+      "name": "Calculate Selected BBB"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').first().json.message.chat.id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2448,
+        656
+      ],
+      "id": "091b5306-2c77-4644-b536-84c6357ee545",
+      "name": "Send Selected BBB Stats",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "02686d15-d25e-4ccb-ada5-fba39307d9b9",
+              "name": "=text",
+              "value": "={{ '🔴 ' + $('Get row(s)3').first().json.name + '\\nНедоступний' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1776,
+        800
+      ],
+      "id": "5944651b-35aa-4b51-b3fd-93c997e2e2f9",
+      "name": "BBB Unavailable"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').first().json.message.chat.id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2000,
+        800
+      ],
+      "id": "ff2fe468-2e96-4920-abef-c2bc6883e9bb",
+      "name": "Send a text message9",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BBB_USERS_ID",
+          "mode": "list",
+          "cachedResultName": "bbb users"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telegram_id",
+              "keyValue": "={{ $('Telegram Trigger1').first().json.callback_query?.from?.id || $('Telegram Trigger1').first().json.message?.from?.id }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "approved"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -144,
+        528
+      ],
+      "id": "025f4990-9744-4d58-a5e9-3014dd304656",
+      "name": "Check User Access",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "b20eb7d5-229f-4db6-8b93-59b8dc4a934c",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        32,
+        528
+      ],
+      "id": "094829dd-7c27-4e28-bff2-35ef3d84a230",
+      "name": "Access Approved"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').first().json.message.chat.id }}",
+        "text": "🔒 У вас немає доступу до BBB Monitor. Зверніться до адміністратора для отримання дозволу.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -336,
+        768
+      ],
+      "id": "e3ad4335-0815-49da-a8d4-d821a68671e6",
+      "name": "Access Denied"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        736,
+        -80
+      ],
+      "id": "2b9abb97-dbae-4233-9219-6b562d60f56e",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BBB_SERVER_STATUS_ID",
+          "mode": "list",
+          "cachedResultName": "bbb server status"
+        },
+        "matchType": "allConditions"
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1008,
+        -16
+      ],
+      "id": "b4d7802f-2543-4a51-8faa-911fa2e8dcbf",
+      "name": "Get Previous BBB Status",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "\nresults = []\n\nfor item in _items:\n    data = item[\"json\"]\n    name = data.get(\"name\")\n\n    if not name:\n        continue\n\n    error = data.get(\"error\")\n\n    status = (\n        \"offline\"\n        if error or data.get(\"status\") == \"unavailable\"\n        else \"online\"\n    )\n\n    results.append({\n        \"json\": {\n            \"server_name\": name,\n            \"status\": status\n        }\n    })\n\nreturn results\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2192,
+        -64
+      ],
+      "id": "99c7363a-52a2-4084-87be-55b967de5c5b",
+      "name": "Detect BBB Status Changes"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2416,
+        -16
+      ],
+      "id": "4cb9a6ed-2dae-4909-b72c-b16d4483725d",
+      "name": "Merge BBB Status Data"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "\nitems = [item[\"json\"] for item in _items]\n\ncurrent = {}\nprevious = {}\nprevious_dates = {}\n\nfor item in items:\n    name = item.get(\"server_name\")\n    status = item.get(\"status\")\n\n    if not name or status not in (\"online\", \"offline\"):\n        continue\n\n    if item.get(\"id\") is not None:\n        previous[name] = status\n        previous_dates[name] = item.get(\"last_changed\")\n    else:\n        current[name] = status\n\nresults = []\n\nfor name, status in current.items():\n    old_status = previous.get(name)\n\n    if old_status is None:\n        change = \"initial\"\n    elif old_status != status:\n        change = \"changed\"\n    else:\n        change = \"unchanged\"\n\n    results.append({\n        \"json\": {\n            \"server_name\": name,\n            \"status\": status,\n            \"previous_status\": old_status,\n            \"change\": change,\n            \"last_changed\": previous_dates.get(name)\n        }\n    })\n\nreturn results\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -16
+      ],
+      "id": "1e354920-8c25-445d-b248-14866e92480b",
+      "name": "Compare BBB Status"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BBB_SERVER_STATUS_ID",
+          "mode": "list",
+          "cachedResultName": "bbb server status"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "server_name",
+              "keyValue": "={{ $json.server_name }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "server_name": "={{ $json.server_name }}",
+            "status": "={{ $json.status }}",
+            "last_changed": "={{ $json.change === 'unchanged' ? $json.last_changed : $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "server_name",
+              "displayName": "server_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_changed",
+              "displayName": "last_changed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3088,
+        -16
+      ],
+      "id": "1453fcc0-4076-4f97-b598-28a849003dca",
+      "name": "Save BBB Status"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "450f32a8-6a5a-459e-9b99-a1252df09c3d",
+              "leftValue": "={{ $json.change }}",
+              "rightValue": "changed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        2864,
+        80
+      ],
+      "id": "18a14115-9686-47ab-b1d2-4a2917f90b09",
+      "name": "Filter BBB Changes"
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_ADMIN_CHAT_ID",
+        "text": "={{ $json.status === 'offline'   ? '🔴 УВАГА! Сервер ' + $json.server_name + ' недоступний!'   : '🟢 Сервер ' + $json.server_name + ' відновив роботу!' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3104,
+        128
+      ],
+      "id": "8c26f210-f890-4330-bc87-f02629c79704",
+      "name": "BBB Status Alert"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "9c742521-be8c-4121-9ba0-64af40865803",
+              "leftValue": "={{ $('Telegram Trigger1').isExecuted }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        2400,
+        192
+      ],
+      "id": "1edf1f96-4431-493a-a8b3-1b055dc55137",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BBB_CHARTS_ID",
+          "mode": "list",
+          "cachedResultName": "BBB Charts"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "period": "={{ 'day' }}",
+            "chat_id": "={{ $('Telegram Trigger1').first().json.message.chat.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "period",
+              "displayName": "period",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "date_from",
+              "displayName": "date_from",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "date_to",
+              "displayName": "date_to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        800,
+        944
+      ],
+      "id": "2a1f14d5-8933-4295-9346-54f3217b6d7c",
+      "name": "BBB Charts — Day"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst history = $input.first().json;\n\nconst earliestDate = String(history.earliest_date || '');\nconst latestDate = String(history.latest_date || '');\n\nconst datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;\n\nif (\n  !datePattern.test(earliestDate) ||\n  !datePattern.test(latestDate)\n) {\n  throw new Error(\n    'Не отримано earliest_date або latest_date з BBB History Dates'\n  );\n}\n\nif (earliestDate > latestDate) {\n  throw new Error('Некоректний діапазон історії BBB');\n}\n\n// Поточна дата за Києвом\nconst today = new Intl.DateTimeFormat('sv-SE', {\n  timeZone: 'Europe/Kyiv',\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit'\n}).format(new Date());\n\n// Верхня межа календаря\nconst maxDate = latestDate < today ? latestDate : today;\n\nif (earliestDate > maxDate) {\n  throw new Error('Немає доступних дат історії BBB');\n}\n\n// Відкриваємо останній доступний місяць\nconst [year, month] = maxDate.split('-').map(Number);\n\nconst [minYear, minMonth] = earliestDate.split('-').map(Number);\nconst [maxYear, maxMonth] = maxDate.split('-').map(Number);\n\nconst pad = value => String(value).padStart(2, '0');\n\n// Доступність стрілок\nconst canGoPrev =\n  year > minYear ||\n  (year === minYear && month > minMonth);\n\nconst canGoNext =\n  year < maxYear ||\n  (year === maxYear && month < maxMonth);\n\n// Кількість днів\nconst daysInMonth = new Date(year, month, 0).getDate();\n\n// Понеділок = 0\nconst firstDay =\n  (new Date(year, month - 1, 1).getDay() + 6) % 7;\n\n// Клавіатура\nconst keyboard = [\n  [\n    {\n      text: '◀️',\n      callback_data: canGoPrev\n        ? 'cal_prev'\n        : 'cal_ignore'\n    },\n    {\n      text: `${pad(month)}/${year}`,\n      callback_data: 'cal_ignore'\n    },\n    {\n      text: '▶️',\n      callback_data: canGoNext\n        ? 'cal_next'\n        : 'cal_ignore'\n    }\n  ],\n  ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].map(text => ({\n    text,\n    callback_data: 'cal_ignore'\n  }))\n];\n\nlet row = [];\n\n// Порожні клітинки\nfor (let i = 0; i < firstDay; i++) {\n  row.push({\n    text: ' ',\n    callback_data: 'cal_ignore'\n  });\n}\n\n// Дні календаря\nfor (let day = 1; day <= daysInMonth; day++) {\n  const dateStr = `${year}-${pad(month)}-${pad(day)}`;\n\n  const available =\n    dateStr >= earliestDate &&\n    dateStr <= maxDate;\n\n  row.push({\n    text: String(day),\n    callback_data: available\n      ? `cal_day_${dateStr}`\n      : 'cal_ignore'\n  });\n\n  if (row.length === 7) {\n    keyboard.push(row);\n    row = [];\n  }\n}\n\n// Останній рядок\nif (row.length > 0) {\n  while (row.length < 7) {\n    row.push({\n      text: ' ',\n      callback_data: 'cal_ignore'\n    });\n  }\n\n  keyboard.push(row);\n}\n\nreturn [{\n  json: {\n    year,\n    month,\n    earliest_date: earliestDate,\n    latest_date: latestDate,\n    today,\n    calendar_title:\n      `📅 Оберіть дату (${pad(month)}/${year}):`,\n    calendar_keyboard: keyboard,\n    can_go_prev: canGoPrev,\n    can_go_next: canGoNext\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        1104
+      ],
+      "id": "12eae306-4d50-4c93-bed8-b0bbc13f3693",
+      "name": "Calendar Start"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').first().json.message.chat.id }}",
+        "text": "📊 BBB Monitor Оберіть потрібну дію:",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📅 Сьогодні",
+                    "additionalFields": {}
+                  },
+                  {
+                    "text": "📆 Період",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "⬅️ Назад",
+                    "additionalFields": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        512
+      ],
+      "id": "6bce0fc2-f344-4c52-b3f9-668fe2296380",
+      "name": "Send a text message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botREPLACE_WITH_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{{ JSON.stringify({\n  chat_id: $('Telegram Trigger1').first().json.message.chat.id,\n  text: $json.calendar_title,\n  reply_markup: {\n    inline_keyboard: $json.calendar_keyboard\n  }\n}) }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        976,
+        1120
+      ],
+      "id": "4d7adcfa-9f6f-4d16-abd9-dbcaf1775245",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst trigger = $('Telegram Trigger1').first().json;\nconst callback = trigger.callback_query || {};\nconst action = callback.data || '';\nconst message = callback.message || {};\n\n// Отримуємо місяць із повідомлення Telegram\nconst text = message.text || message.caption || '';\nconst match = text.match(/(\\d{1,2})\\/(\\d{4})/);\n\n// Поточна дата за Києвом\nconst today = new Intl.DateTimeFormat('sv-SE', {\n  timeZone: 'Europe/Kyiv',\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit'\n}).format(new Date());\n\nconst [currentYear, currentMonth] = today.split('-').map(Number);\n\nlet year = match ? Number(match[2]) : currentYear;\nlet month = match ? Number(match[1]) : currentMonth;\n\n// Перемикання місяців\nif (action === 'cal_prev') {\n  month--;\n\n  if (month < 1) {\n    month = 12;\n    year--;\n  }\n}\n\nif (action === 'cal_next') {\n  month++;\n\n  if (month > 12) {\n    month = 1;\n    year++;\n  }\n}\n\n// Доступний діапазон історії\nconst history = $input.first().json;\nconst earliestDate = String(history.earliest_date || '');\n\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(earliestDate)) {\n  throw new Error('Не отримано earliest_date з BBB History Dates');\n}\n\nconst [minYear, minMonth] = earliestDate.split('-').map(Number);\n\n// Обмеження найстарішим місяцем\nif (\n  year < minYear ||\n  (year === minYear && month < minMonth)\n) {\n  year = minYear;\n  month = minMonth;\n}\n\n// Обмеження поточним місяцем\nif (\n  year > currentYear ||\n  (year === currentYear && month > currentMonth)\n) {\n  year = currentYear;\n  month = currentMonth;\n}\n\nreturn [{\n  json: {\n    year,\n    month,\n    earliest_date: earliestDate,\n    latest_date: history.latest_date,\n    today,\n    chat_id: message.chat?.id,\n    message_id: message.message_id,\n    callback_query_id: callback.id\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        992
+      ],
+      "id": "05d08dd1-ae43-4976-a0c1-412101f1ca01",
+      "name": "Calendar Navigation"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst input = $input.first().json;\n\nconst year = Number(input.year);\nconst month = Number(input.month);\n\nconst earliestDate = String(input.earliest_date || '');\nconst latestDate = String(input.latest_date || '');\nconst today = String(input.today || '');\n\nconst datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;\n\n// Перевірка дат\nif (\n  !datePattern.test(earliestDate) ||\n  !datePattern.test(latestDate)\n) {\n  throw new Error('Не отримано межі історії BBB');\n}\n\nif (earliestDate > latestDate) {\n  throw new Error('Некоректний діапазон дат BBB');\n}\n\nif (\n  !Number.isInteger(year) ||\n  !Number.isInteger(month) ||\n  month < 1 ||\n  month > 12\n) {\n  throw new Error('Некоректний місяць календаря');\n}\n\n// Не дозволяємо обирати дати після сьогодні\nconst maxDate =\n  datePattern.test(today) && today < latestDate\n    ? today\n    : latestDate;\n\nconst [minYear, minMonth] = earliestDate.split('-').map(Number);\nconst [maxYear, maxMonth] = maxDate.split('-').map(Number);\n\n// Перемикання між місяцями\nconst canGoPrev =\n  year > minYear ||\n  (year === minYear && month > minMonth);\n\nconst canGoNext =\n  year < maxYear ||\n  (year === maxYear && month < maxMonth);\n\n// Кількість днів у місяці\nconst daysInMonth = new Date(year, month, 0).getDate();\n\n// Понеділок = 0\nconst firstDay =\n  (new Date(year, month - 1, 1).getDay() + 6) % 7;\n\nconst pad = n => String(n).padStart(2, '0');\n\n// Клавіатура календаря\nconst keyboard = [\n  [\n    {\n      text: '◀️',\n      callback_data: canGoPrev\n        ? 'cal_prev'\n        : 'cal_ignore'\n    },\n    {\n      text: `${pad(month)}/${year}`,\n      callback_data: 'cal_ignore'\n    },\n    {\n      text: '▶️',\n      callback_data: canGoNext\n        ? 'cal_next'\n        : 'cal_ignore'\n    }\n  ],\n  ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].map(text => ({\n    text,\n    callback_data: 'cal_ignore'\n  }))\n];\n\nlet row = [];\n\n// Порожні клітинки перед першим днем\nfor (let i = 0; i < firstDay; i++) {\n  row.push({\n    text: ' ',\n    callback_data: 'cal_ignore'\n  });\n}\n\n// Дні місяця\nfor (let day = 1; day <= daysInMonth; day++) {\n  const dateStr = `${year}-${pad(month)}-${pad(day)}`;\n\n  const available =\n    dateStr >= earliestDate &&\n    dateStr <= maxDate;\n\n  row.push({\n    text: String(day),\n    callback_data: available\n      ? `cal_day_${dateStr}`\n      : 'cal_ignore'\n  });\n\n  if (row.length === 7) {\n    keyboard.push(row);\n    row = [];\n  }\n}\n\n// Заповнення останнього рядка\nif (row.length > 0) {\n  while (row.length < 7) {\n    row.push({\n      text: ' ',\n      callback_data: 'cal_ignore'\n    });\n  }\n\n  keyboard.push(row);\n}\n\n\n\nreturn [{\n  json: {\n    ...input,\n    earliest_date: earliestDate,\n    latest_date: latestDate,\n    calendar_title:\n      `📅 Оберіть дату (${pad(month)}/${year}):`,\n    calendar_keyboard: keyboard\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        992
+      ],
+      "id": "9576c2f1-b159-4c90-bf63-e4164738087d",
+      "name": "Calendar Build"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botREPLACE_WITH_BOT_TOKEN/editMessageText",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{{ JSON.stringify({\n  chat_id: $json.chat_id,\n  message_id: $json.message_id,\n  text: $json.calendar_title,\n  reply_markup: {\n    inline_keyboard: $json.calendar_keyboard || []\n  }\n}) }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        640,
+        1248
+      ],
+      "id": "e694a0fa-eea1-4602-a41b-92cb35b86e73",
+      "name": "Calendar Edit Message",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst callback = $('Telegram Trigger1').first().json.callback_query;\n\nconst selectedDate = callback.data.replace('cal_day_', '');\n\nconst [year, month, day] = selectedDate.split('-');\n\nconst formattedDate = `${day}.${month}.${year}`;\n\nreturn [{\n  json: {\n    chat_id: callback.message.chat.id,\n    message_id: callback.message.message_id,\n    callback_query_id: callback.id,\n    selected_date: selectedDate,\n    formatted_date: formattedDate,\n    calendar_title: `📅 Обрана дата: ${formattedDate}`,\n    calendar_keyboard: [\n      [\n        {\n          text: `📊 Графік за ${formattedDate}`,\n          callback_data: `cal_single_${selectedDate}`\n        }\n      ],\n      [\n        {\n          text: \"📆 Обрати дату завершення\",\n          callback_data: `cal_end_${selectedDate}`\n        }\n      ]\n    ]\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        1024
+      ],
+      "id": "360f7b0b-a34f-48c7-b39e-73bf09ab9167",
+      "name": "Calendar Select Date"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst callback = $('Telegram Trigger1').first().json.callback_query;\n\nconst selectedDate = callback.data.replace('cal_single_', '');\n\nreturn [{\n  json: {\n    chat_id: callback.message.chat.id,\n    selected_date: selectedDate,\n    date_from: selectedDate,\n    date_to: selectedDate,\n    period_type: 'single_day'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        1280
+      ],
+      "id": "075a7165-4e44-462c-9f9d-61fd5a700aec",
+      "name": "Chart Selected Date"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BBB_CHARTS_ID",
+          "mode": "list",
+          "cachedResultName": "BBB Charts"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "period": "={{ $('Chart Selected Range').isExecuted ? 'range' : 'day' }}",
+            "chat_id": "={{ $('Chart Selected Range').isExecuted ? $('Chart Selected Range').first().json.chat_id : $('Chart Selected Date').first().json.chat_id }}",
+            "date_from": "={{ $('Chart Selected Range').isExecuted ? $('Chart Selected Range').first().json.date_from : $('Chart Selected Date').first().json.date_from }}",
+            "date_to": "={{ $('Chart Selected Range').isExecuted ? $('Chart Selected Range').first().json.date_to : $('Chart Selected Date').first().json.date_to }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "period",
+              "displayName": "period",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "date_from",
+              "displayName": "date_from",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date_to",
+              "displayName": "date_to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1424,
+        1280
+      ],
+      "id": "c6508974-29c0-49a1-8432-e48de607a2fc",
+      "name": "BBB Charts — Selected Date"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst callback = $('Telegram Trigger1').first().json.callback_query;\n\n// Початкова дата, яку вже вибрали\nconst startDate = callback.data.replace('cal_end_', '');\n\nconst [year, month] = startDate.split('-').map(Number);\n\nconst today = new Date();\nconst daysInMonth = new Date(year, month, 0).getDate();\nconst firstDay =\n  (new Date(year, month - 1, 1).getDay() + 6) % 7;\n\nconst keyboard = [\n  [\n    {\n      text: '◀️',\n      callback_data: `cal_end_prev_${startDate}_${year}-${String(month).padStart(2, '0')}`\n    },\n    {\n      text: `📅 ${String(month).padStart(2, '0')}/${year}`,\n      callback_data: 'cal_ignore'\n    },\n    {\n      text: '▶️',\n      callback_data: `cal_end_next_${startDate}_${year}-${String(month).padStart(2, '0')}`\n    }\n  ],\n  ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].map(text => ({\n    text,\n    callback_data: 'cal_ignore'\n  }))\n];\n\nlet row = [];\n\n// Порожні клітинки перед першим днем місяця\nfor (let i = 0; i < firstDay; i++) {\n  row.push({\n    text: ' ',\n    callback_data: 'cal_ignore'\n  });\n}\n\n// Дні місяця\nfor (let day = 1; day <= daysInMonth; day++) {\n  const dateStr =\n    `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;\n\n  const date = new Date(year, month - 1, day);\n\n  row.push({\n    text: String(day),\n    callback_data:\n      dateStr < startDate || date > today\n        ? 'cal_ignore'\n        : `cal_range_${startDate}_${dateStr}`\n  });\n\n  if (row.length === 7) {\n    keyboard.push(row);\n    row = [];\n  }\n}\n\n// Доповнюємо останній тиждень\nif (row.length) {\n  while (row.length < 7) {\n    row.push({\n      text: ' ',\n      callback_data: 'cal_ignore'\n    });\n  }\n\n  keyboard.push(row);\n}\n\nreturn [{\n  json: {\n    chat_id: callback.message.chat.id,\n    message_id: callback.message.message_id,\n    callback_query_id: callback.id,\n    calendar_title:\n      `📅 Початок: ${startDate.split('-').reverse().join('.')}\\n` +\n      'Оберіть дату завершення:',\n    calendar_keyboard: keyboard\n  }\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        1280
+      ],
+      "id": "0d8a330b-a827-40cd-b86a-fee350d24031",
+      "name": "Calendar End Start"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst callback = $('Telegram Trigger1').first().json.callback_query;\n\n// Отримуємо початкову та кінцеву дати\nconst dates = callback.data.replace('cal_range_', '');\nconst [dateFrom, dateTo] = dates.split('_');\n\n// Перевіряємо правильність періоду\nif (dateFrom > dateTo) {\n  throw new Error('Дата завершення раніше дати початку');\n}\n\nreturn [{\n  json: {\n    chat_id: callback.message.chat.id,\n    message_id: callback.message.message_id,\n    callback_query_id: callback.id,\n    date_from: dateFrom,\n    date_to: dateTo,\n    period_type: 'date_range'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        1488
+      ],
+      "id": "7f064f5e-8cf4-49a5-8df1-f58b6f03b857",
+      "name": "Chart Selected Range"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst callback = $('Telegram Trigger1').first().json.callback_query;\nconst data = callback.data;\n\n// Наприклад:\n// cal_end_next_2026-11-17_2026-11\nconst match = data.match(\n  /^cal_end_(prev|next)_(\\d{4}-\\d{2}-\\d{2})_(\\d{4})-(\\d{2})$/\n);\n\nif (!match) {\n  throw new Error('Неправильна команда календаря');\n}\n\nconst action = match[1];\nconst startDate = match[2];\n\nlet year = Number(match[3]);\nlet month = Number(match[4]);\n\n// Перемикання місяця\nif (action === 'next') {\n  month++;\n  if (month > 12) {\n    month = 1;\n    year++;\n  }\n} else {\n  month--;\n  if (month < 1) {\n    month = 12;\n    year--;\n  }\n}\n\n// Межі календаря\nconst [startYear, startMonth] = startDate\n  .split('-')\n  .map(Number);\n\nconst now = new Date();\nconst currentYear = now.getFullYear();\nconst currentMonth = now.getMonth() + 1;\n\n// Не переходимо раніше початкового місяця\nif (\n  year < startYear ||\n  (year === startYear && month < startMonth)\n) {\n  year = startYear;\n  month = startMonth;\n}\n\n// Не переходимо в майбутні місяці\nif (\n  year > currentYear ||\n  (year === currentYear && month > currentMonth)\n) {\n  year = currentYear;\n  month = currentMonth;\n}\n\nconst daysInMonth = new Date(year, month, 0).getDate();\n\nconst firstDay =\n  (new Date(year, month - 1, 1).getDay() + 6) % 7;\n\nconst keyboard = [\n  [\n    {\n      text: '◀️',\n      callback_data:\n        `cal_end_prev_${startDate}_${year}-${String(month).padStart(2, '0')}`\n    },\n    {\n      text: `📅 ${String(month).padStart(2, '0')}/${year}`,\n      callback_data: 'cal_ignore'\n    },\n    {\n      text: '▶️',\n      callback_data:\n        `cal_end_next_${startDate}_${year}-${String(month).padStart(2, '0')}`\n    }\n  ],\n  [\n    ...['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].map(text => ({\n      text,\n      callback_data: 'cal_ignore'\n    }))\n  ]\n];\n\nlet row = [];\n\nfor (let i = 0; i < firstDay; i++) {\n  row.push({\n    text: ' ',\n    callback_data: 'cal_ignore'\n  });\n}\n\nconst today = [\n  now.getFullYear(),\n  String(now.getMonth() + 1).padStart(2, '0'),\n  String(now.getDate()).padStart(2, '0')\n].join('-');\n\nfor (let day = 1; day <= daysInMonth; day++) {\n  const dateStr =\n    `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;\n\n  row.push({\n    text: String(day),\n    callback_data:\n      dateStr < startDate || dateStr > today\n        ? 'cal_ignore'\n        : `cal_range_${startDate}_${dateStr}`\n  });\n\n  if (row.length === 7) {\n    keyboard.push(row);\n    row = [];\n  }\n}\n\nif (row.length) {\n  while (row.length < 7) {\n    row.push({\n      text: ' ',\n      callback_data: 'cal_ignore'\n    });\n  }\n  keyboard.push(row);\n}\n\n// Кнопка «Назад» прибрана\n\nreturn [{\n  json: {\n    chat_id: callback.message.chat.id,\n    message_id: callback.message.message_id,\n    callback_query_id: callback.id,\n    calendar_title:\n      `📅 Початок: ${startDate.split('-').reverse().join('.')}\\n` +\n      'Оберіть дату завершення:',\n    calendar_keyboard: keyboard\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        1456
+      ],
+      "id": "6d13848f-fd21-4d79-b386-d6ea50738f3c",
+      "name": "Calendar End Navigation"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BBB_HISTORY_DATES_ID",
+          "mode": "list",
+          "cachedResultName": "BBB History Dates"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        48,
+        1216
+      ],
+      "id": "11310d22-1474-49aa-bb7b-34c8ea924c61",
+      "name": "Get BBB History Range"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst trigger = $('Telegram Trigger1').first().json;\nconst callback = trigger.callback_query || {};\nconst message = callback.message || {};\n\nconst today = new Intl.DateTimeFormat('sv-SE', {\n  timeZone: 'Europe/Kyiv',\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit'\n}).format(new Date());\n\n// Тимчасові межі історії.\n// Початок — підтверджена дата першого CSV.\nconst earliestDate = '2026-09-01';\n\n// Остання доступна дата обмежується сьогоднішнім днем.\nconst latestDate = today;\n\nreturn [{\n  json: {\n    earliest_date: earliestDate,\n    latest_date: latestDate,\n    today,\n    chat_id: message.chat?.id,\n    message_id: message.message_id,\n    callback_query_id: callback.id\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        736
+      ],
+      "id": "ca8c7732-f66d-4d4f-ac74-69807fb2dcd4",
+      "name": "BBB Calendar Dates Cache"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botREPLACE_WITH_BOT_TOKEN/editMessageText",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{{ JSON.stringify({\n  chat_id: $json.chat_id,\n  message_id: $json.message_id,\n  text:\n    '📊 Обраний період:\\n' +\n    $json.date_from.split('-').reverse().join('.') +\n    ' — ' +\n    $json.date_to.split('-').reverse().join('.'),\n  reply_markup: {\n    inline_keyboard: []\n  }\n}) }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        688,
+        1456
+      ],
+      "id": "32c706e6-7061-4e3d-b5a0-f614243bbd0f",
+      "name": "Calendar Range Finish"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Chart Selected Range').first().json.chat_id }}",
+        "text": "⏳ Формую графіки, зачекайте...",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        912,
+        1456
+      ],
+      "id": "0746a370-1e2a-40c8-989d-bd3b05625bdc",
+      "name": "Charts Loading Message"
+    },
+    {
+      "parameters": {
+        "operation": "deleteMessage",
+        "chatId": "={{ $if($('Charts Loading Single Day').isExecuted, $('Charts Loading Single Day').first().json.result.chat.id, $('Charts Loading Message').first().json.result.chat.id) }}",
+        "messageId": "={{ $if($('Charts Loading Single Day').isExecuted, $('Charts Loading Single Day').first().json.result.message_id, $('Charts Loading Message').first().json.result.message_id) }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1648,
+        1280
+      ],
+      "id": "bd665e67-ed35-4efb-bc28-72818e96a5e8",
+      "name": "Delete a chat message",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Chart Selected Date').first().json.chat_id }}",
+        "text": " ⏳ Формую графіки, зачекайте...",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        1200
+      ],
+      "id": "eab6b3e8-ab8d-4475-ad19-38c3a197530f",
+      "name": "Charts Loading Single Day"
+    },
+    {
+      "parameters": {
+        "operation": "deleteMessage",
+        "chatId": "={{ $('Charts Loading Today').first().json.result.chat.id }}",
+        "messageId": "={{ $('Charts Loading Today').first().json.result.message_id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        976,
+        944
+      ],
+      "id": "ab948dd0-7488-420b-a9fd-25ce91050c0a",
+      "name": "Delete Charts Loading Today",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger1').first().json.message?.chat?.id }}",
+        "text": " ⏳ Формую графіки, зачекайте...",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        576,
+        848
+      ],
+      "id": "5758d3d3-3fcf-454d-9b8e-443863b46238",
+      "name": "Charts Loading Today"
+    },
+    {
+      "parameters": {
+        "url": "https://quickchart.io/chart",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "c",
+              "value": "=\n{{ JSON.stringify((() => {\n  const s = $('Calculate Selected BBB').first().json;\n  const capacity = Number(s.capacity || 400);\n  const participants = Number(s.total_participants || 0);\n  const percent = capacity > 0\n    ? participants / capacity * 100\n    : 0;\n\n  const color = percent >= 80\n    ? '#dc2626'\n    : percent >= 50\n      ? '#eab308'\n      : '#16a34a';\n\n  return {\n    type: 'doughnut',\n    data: {\n      labels: ['Зайнято', 'Вільно'],\n      datasets: [{\n        data: [\n          Math.min(capacity, participants),\n          Math.max(0, capacity - participants)\n        ],\n        backgroundColor: [color, '#e5e7eb'],\n        borderWidth: 0\n      }]\n    },\n    options: {\n      cutoutPercentage: 76,\n      title: {\n        display: true,\n        text: s.server_name + ' — Завантаженість',\n        fontSize: 20\n      },\n      legend: {\n        display: true,\n        position: 'bottom'\n      },\n      plugins: {\n        doughnutlabel: {\n          labels: [\n            {\n              text: percent.toFixed(1) + '%',\n              font: { size: 34, weight: 'bold' },\n              color: color\n            },\n            {\n              text: participants + ' із ' + capacity,\n              font: { size: 19 },\n              color: '#666666'\n            },\n            {\n              text: 'учасників',\n              font: { size: 14 },\n              color: '#888888'\n            }\n          ]\n        }\n      }\n    }\n  };\n})()) }}\n"
+            },
+            {
+              "name": "width",
+              "value": "600"
+            },
+            {
+              "name": "height",
+              "value": "450"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2224,
+        656
+      ],
+      "id": "6007daf5-7bb5-424b-b691-169766f04041",
+      "name": "Generate BBB Pie Chart"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Check User Access').first().json.telegram_id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "={{ $('Calculate Selected BBB').first().json.text }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2464,
+        800
+      ],
+      "id": "8ed417c6-c34c-4908-85f2-649a4f05cff2",
+      "name": "Telegram — Send Photo"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get BBB Servers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get BBB Servers": {
+      "main": [
+        [
+          {
+            "node": "BBB — Universal Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BBB — Universal Request": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields6": {
+      "main": [
+        [
+          {
+            "node": "XML6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XML6": {
+      "main": [
+        [
+          {
+            "node": "Add Server Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Server Name": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields7": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Code in Python7",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Detect BBB Status Changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python7": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Check User Access",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch3": {
+      "main": [
+        [
+          {
+            "node": "Get BBB Servers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get row(s)2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Selected BBB Server",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Charts Loading Today",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BBB Calendar Dates Cache",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calendar Select Date",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chart Selected Date",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calendar End Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chart Selected Range",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calendar End Navigation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BBB Calendar Dates Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)2": {
+      "main": [
+        [
+          {
+            "node": "Code in Python8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python8": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Selected BBB Server": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)3": {
+      "main": [
+        [
+          {
+            "node": "Check Selected BBB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Selected BBB": {
+      "main": [
+        [
+          {
+            "node": "XML7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BBB Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XML7": {
+      "main": [
+        [
+          {
+            "node": "Add Selected Server Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Selected Server Name": {
+      "main": [
+        [
+          {
+            "node": "Calculate Selected BBB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Selected BBB": {
+      "main": [
+        [
+          {
+            "node": "Generate BBB Pie Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BBB Unavailable": {
+      "main": [
+        [
+          {
+            "node": "Send a text message9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check User Access": {
+      "main": [
+        [
+          {
+            "node": "Access Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Access Approved": {
+      "main": [
+        [
+          {
+            "node": "Switch3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Access Denied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get BBB Servers",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Previous BBB Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect BBB Status Changes": {
+      "main": [
+        [
+          {
+            "node": "Merge BBB Status Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Previous BBB Status": {
+      "main": [
+        [
+          {
+            "node": "Merge BBB Status Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge BBB Status Data": {
+      "main": [
+        [
+          {
+            "node": "Compare BBB Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare BBB Status": {
+      "main": [
+        [
+          {
+            "node": "Filter BBB Changes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save BBB Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter BBB Changes": {
+      "main": [
+        [
+          {
+            "node": "BBB Status Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a text message7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BBB Charts — Day": {
+      "main": [
+        [
+          {
+            "node": "Delete Charts Loading Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Start": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        []
+      ]
+    },
+    "Calendar Navigation": {
+      "main": [
+        [
+          {
+            "node": "Calendar Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Build": {
+      "main": [
+        [
+          {
+            "node": "Calendar Edit Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Select Date": {
+      "main": [
+        [
+          {
+            "node": "Calendar Edit Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chart Selected Date": {
+      "main": [
+        [
+          {
+            "node": "Charts Loading Single Day",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar End Start": {
+      "main": [
+        [
+          {
+            "node": "Calendar Edit Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chart Selected Range": {
+      "main": [
+        [
+          {
+            "node": "Calendar Range Finish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar End Navigation": {
+      "main": [
+        [
+          {
+            "node": "Calendar Edit Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get BBB History Range": {
+      "main": [
+        [
+          {
+            "node": "Calendar Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BBB Calendar Dates Cache": {
+      "main": [
+        [
+          {
+            "node": "Calendar Navigation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Calendar Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Range Finish": {
+      "main": [
+        [
+          {
+            "node": "Charts Loading Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Charts Loading Message": {
+      "main": [
+        [
+          {
+            "node": "BBB Charts — Selected Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BBB Charts — Selected Date": {
+      "main": [
+        [
+          {
+            "node": "Delete a chat message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Charts Loading Single Day": {
+      "main": [
+        [
+          {
+            "node": "BBB Charts — Selected Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Charts Loading Today": {
+      "main": [
+        [
+          {
+            "node": "BBB Charts — Day",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate BBB Pie Chart": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Send Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
